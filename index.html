@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Corporate Learning Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <style>
+    [x-cloak] { display: none !important; }
+    .card-hover { transition: box-shadow 0.2s, transform 0.2s; }
+    .card-hover:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.12); transform: translateY(-2px); }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="libraryApp()" x-init="init()">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">📚</span>
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Arthrex Learning Library</h1>
+          <p class="text-xs text-gray-500">Borrow. Learn. Return.</p>
+        </div>
+      </div>
+      <nav class="flex gap-2">
+        <a href="index.html" class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg">Catalog</a>
+        <a href="admin.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Admin</a>
+        <a href="settings.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Search & Filter Bar -->
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <input type="text" placeholder="Search by title or author..." x-model="search"
+          class="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+      <select x-model="filterCategory" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">All Categories</option>
+        <template x-for="cat in categories" :key="cat">
+          <option :value="cat" x-text="cat"></option>
+        </template>
+      </select>
+      <select x-model="filterLocation" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">All Locations</option>
+        <option value="ACT">ACT</option>
+        <option value="ACTS">ACTS</option>
+      </select>
+      <select x-model="filterStatus" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+        <option value="">All Availability</option>
+        <option value="available">Available</option>
+        <option value="checked_out">Checked Out</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Book Grid -->
+  <main class="max-w-7xl mx-auto px-4 pb-12">
+
+    <!-- Loading -->
+    <div x-show="loading" class="flex justify-center py-20">
+      <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+    </div>
+
+    <!-- Error -->
+    <div x-show="error && !loading" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm" x-text="error"></div>
+
+    <!-- Empty state -->
+    <div x-show="!loading && !error && filteredBooks.length === 0" class="text-center py-20 text-gray-400">
+      <svg class="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+      </svg>
+      <p class="text-lg font-medium">No books found</p>
+      <p class="text-sm mt-1">Try adjusting your search or filters</p>
+    </div>
+
+    <!-- Book Cards -->
+    <div x-show="!loading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      <template x-for="book in filteredBooks" :key="book.id">
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden card-hover flex flex-col">
+          <!-- Cover -->
+          <div class="h-48 bg-gradient-to-br from-blue-100 to-indigo-200 flex items-center justify-center relative overflow-hidden">
+            <template x-if="book.cover_url">
+              <img :src="book.cover_url" :alt="book.title" class="w-full h-full object-cover" />
+            </template>
+            <template x-if="!book.cover_url">
+              <svg class="w-16 h-16 text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+              </svg>
+            </template>
+            <!-- Category badge -->
+            <span x-show="book.category" x-text="book.category"
+              class="absolute top-2 left-2 px-2 py-0.5 bg-white/80 backdrop-blur text-xs font-medium text-gray-700 rounded-full border border-gray-200"></span>
+            <!-- Location badge -->
+            <span x-show="book.location" x-text="book.location"
+              :class="book.location === 'ACT' ? 'bg-purple-600 text-white' : 'bg-indigo-600 text-white'"
+              class="absolute top-2 right-2 px-2 py-0.5 text-xs font-bold rounded-full"></span>
+          </div>
+
+          <!-- Info -->
+          <div class="p-4 flex flex-col flex-1">
+            <h3 class="font-semibold text-gray-900 text-sm leading-snug line-clamp-2" x-text="book.title"></h3>
+            <p class="text-xs text-gray-500 mt-1" x-text="book.author"></p>
+            <p class="text-xs text-gray-400 mt-0.5" x-show="book.isbn" x-text="'ISBN: ' + book.isbn"></p>
+            <p class="text-xs mt-0.5" x-show="book.location">
+              <span class="font-medium text-gray-500">Location: </span>
+              <span :class="book.location === 'ACT' ? 'text-purple-700 font-semibold' : 'text-indigo-700 font-semibold'" x-text="book.location"></span>
+            </p>
+
+            <!-- Star Rating -->
+            <button @click.stop="openReviews(book)" class="flex items-center gap-1 mt-1.5 group focus:outline-none" :title="book.reviewCount > 0 ? 'See ' + book.reviewCount + ' review' + (book.reviewCount !== 1 ? 's' : '') : 'No reviews yet'">
+              <template x-for="star in [1,2,3,4,5]" :key="star">
+                <span class="text-sm leading-none transition-colors"
+                  :class="star <= Math.round(book.avgRating) ? 'text-yellow-400' : 'text-gray-300 group-hover:text-gray-400'">&#9733;</span>
+              </template>
+              <span class="text-xs text-gray-400 ml-0.5 group-hover:text-gray-600"
+                x-text="book.reviewCount > 0 ? '(' + book.reviewCount + ')' : ''"></span>
+            </button>
+
+            <!-- Availability -->
+            <div class="mt-3 flex-1">
+              <template x-for="copy in book.copies" :key="copy.id">
+                <div class="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                  <div class="flex items-center gap-2">
+                    <span :class="copy.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'"
+                      class="text-xs font-medium px-2 py-0.5 rounded-full">
+                      <span x-text="copy.available ? 'Available' : 'Checked Out'"></span>
+                    </span>
+                  </div>
+                  <div x-show="!copy.available && copy.checkout" class="text-right">
+                    <p class="text-xs text-gray-500" x-text="copy.checkout ? copy.checkout.borrower_name : ''"></p>
+                    <p class="text-xs" :class="copy.checkout && isOverdue(copy.checkout.due_date) ? 'text-red-500 font-medium' : 'text-gray-400'"
+                      x-text="copy.checkout ? 'Due: ' + formatDate(copy.checkout.due_date) : ''"></p>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-3 flex gap-2">
+              <template x-if="book.copies.some(c => c.available)">
+                <button @click="openCheckout(book)"
+                  class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium py-2 rounded-lg transition-colors">
+                  Check Out
+                </button>
+              </template>
+              <template x-if="book.copies.some(c => !c.available)">
+                <button @click="openCheckin(book)"
+                  class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-medium py-2 rounded-lg transition-colors">
+                  Return Copy
+                </button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </template>
+    </div>
+  </main>
+
+  <!-- Checkout Modal -->
+  <div x-show="checkoutModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click.self="checkoutModal.open = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <h2 class="text-lg font-bold text-gray-900 mb-1">Check Out Book</h2>
+      <p class="text-sm text-gray-500 mb-4" x-text="checkoutModal.book?.title"></p>
+
+      <!-- Copy selector if multiple available -->
+      <template x-if="checkoutModal.availableCopies && checkoutModal.availableCopies.length > 1">
+        <div class="mb-4">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Copy</label>
+          <select x-model="checkoutModal.selectedCopyId" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <template x-for="copy in checkoutModal.availableCopies" :key="copy.id">
+              <option :value="copy.id" x-text="copy.copy_code || ('Copy #' + copy.copy_number)"></option>
+            </template>
+          </select>
+        </div>
+      </template>
+
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your Name <span class="text-red-500">*</span></label>
+          <input type="text" x-model="checkoutModal.name" placeholder="Jane Smith"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your Email <span class="text-red-500">*</span></label>
+          <input type="email" x-model="checkoutModal.email" placeholder="jane.smith@company.com"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div class="bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
+          Due date: <strong x-text="dueDate()"></strong> (30-day loan period)
+        </div>
+        <p x-show="checkoutModal.error" class="text-red-500 text-xs" x-text="checkoutModal.error"></p>
+      </div>
+
+      <div class="mt-5 flex gap-3">
+        <button @click="checkoutModal.open = false"
+          class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button @click="submitCheckout()" :disabled="checkoutModal.loading"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+          <span x-show="!checkoutModal.loading">Confirm Checkout</span>
+          <span x-show="checkoutModal.loading">Processing...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Check-in Modal -->
+  <div x-show="checkinModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click.self="checkinModal.open = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <h2 class="text-lg font-bold text-gray-900 mb-1">Return Book</h2>
+      <p class="text-sm text-gray-500 mb-4" x-text="checkinModal.book?.title"></p>
+
+      <div class="space-y-2">
+        <template x-for="copy in checkinModal.checkedOutCopies" :key="copy.id">
+          <div class="border border-gray-200 rounded-lg p-3 flex items-center justify-between">
+            <div>
+              <p class="text-sm font-medium text-gray-900" x-text="copy.checkout?.borrower_name"></p>
+              <p class="text-xs text-gray-500" x-text="copy.checkout?.borrower_email"></p>
+              <p class="text-xs mt-0.5" :class="isOverdue(copy.checkout?.due_date) ? 'text-red-500 font-medium' : 'text-gray-400'"
+                x-text="'Due: ' + formatDate(copy.checkout?.due_date) + (isOverdue(copy.checkout?.due_date) ? ' — OVERDUE' : '')"></p>
+            </div>
+            <button @click="submitCheckin(copy)"
+              class="ml-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-3 py-1.5 rounded-lg">
+              Return
+            </button>
+          </div>
+        </template>
+      </div>
+
+      <p x-show="checkinModal.error" class="text-red-500 text-xs mt-2" x-text="checkinModal.error"></p>
+
+      <div class="mt-5">
+        <button @click="checkinModal.open = false"
+          class="w-full border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Modal (shown after return) -->
+  <div x-show="reviewModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+      <h2 class="text-lg font-bold text-gray-900 mb-1">How was the book?</h2>
+      <p class="text-sm text-gray-500 mb-4" x-text="reviewModal.bookTitle"></p>
+
+      <div class="mb-4">
+        <p class="text-sm font-medium text-gray-700 mb-2">Your rating <span class="text-gray-400">(optional)</span></p>
+        <div class="flex gap-1">
+          <template x-for="star in [1,2,3,4,5]" :key="star">
+            <button type="button" @click="reviewModal.rating = star"
+              class="text-3xl transition-transform hover:scale-110 focus:outline-none"
+              :class="star <= reviewModal.rating ? 'text-yellow-400' : 'text-gray-300'">
+              &#9733;
+            </button>
+          </template>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Leave a review <span class="text-gray-400">(optional)</span></label>
+        <textarea x-model="reviewModal.text" rows="3" placeholder="Share your thoughts about this book..."
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
+      </div>
+
+      <div class="flex gap-3">
+        <button @click="skipReview()"
+          class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Skip</button>
+        <button @click="submitReview()" :disabled="reviewModal.rating === 0"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-40">Submit Review</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reviews Viewer Modal -->
+  <div x-show="reviewsModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click.self="reviewsModal.open = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[80vh] flex flex-col">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-gray-900" x-text="reviewsModal.bookTitle"></h2>
+          <div class="flex items-center gap-2 mt-1">
+            <div class="flex">
+              <template x-for="star in [1,2,3,4,5]" :key="star">
+                <span class="text-lg" :class="star <= Math.round(reviewsModal.avg) ? 'text-yellow-400' : 'text-gray-300'">&#9733;</span>
+              </template>
+            </div>
+            <span class="text-sm text-gray-500" x-text="reviewsModal.avg > 0 ? reviewsModal.avg.toFixed(1) + ' (' + reviewsModal.reviews.length + ' review' + (reviewsModal.reviews.length !== 1 ? 's' : '') + ')' : 'No reviews yet'"></span>
+          </div>
+        </div>
+        <button @click="reviewsModal.open = false" class="text-gray-400 hover:text-gray-600 text-xl font-bold leading-none">&times;</button>
+      </div>
+      <div class="overflow-y-auto flex-1 space-y-3">
+        <template x-if="reviewsModal.reviews.length === 0">
+          <p class="text-sm text-gray-400 text-center py-6">No reviews yet. Be the first!</p>
+        </template>
+        <template x-for="r in reviewsModal.reviews" :key="r.id">
+          <div class="border border-gray-100 rounded-xl p-3">
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-medium text-gray-800" x-text="r.borrower_name"></span>
+              <div class="flex">
+                <template x-for="star in [1,2,3,4,5]" :key="star">
+                  <span class="text-sm" :class="star <= r.rating ? 'text-yellow-400' : 'text-gray-200'">&#9733;</span>
+                </template>
+              </div>
+            </div>
+            <p x-show="r.review_text" class="text-xs text-gray-600" x-text="r.review_text"></p>
+            <p class="text-xs text-gray-400 mt-1" x-text="formatDate(r.created_at)"></p>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast notification -->
+  <div x-show="toast.show" x-cloak x-transition
+    class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white"
+    :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'"
+    x-text="toast.message"></div>
+
+  <script>
+    function libraryApp() {
+      return {
+        books: [],
+        loading: true,
+        error: '',
+        search: '',
+        filterCategory: '',
+        filterStatus: '',
+        filterLocation: '',
+        checkoutModal: { open: false, book: null, name: '', email: '', error: '', loading: false, availableCopies: [], selectedCopyId: null },
+        checkinModal: { open: false, book: null, checkedOutCopies: [], error: '' },
+        reviewModal: { open: false, bookId: null, bookTitle: '', checkoutId: null, borrowerName: '', rating: 0, text: '' },
+        reviewsModal: { open: false, bookId: null, bookTitle: '', reviews: [], avg: 0 },
+        toast: { show: false, message: '', type: 'success' },
+        supabase: null,
+        loanDays: 30,
+
+        async init() {
+          if (!window.SUPABASE_URL || !window.SUPABASE_ANON_KEY || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            this.error = 'Supabase is not configured. Please edit config.js with your Supabase project URL and anon key.';
+            this.loading = false;
+            return;
+          }
+          this.supabase = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          const saved = localStorage.getItem('loan_days');
+          if (saved) this.loanDays = parseInt(saved);
+          await this.loadBooks();
+        },
+
+        async loadBooks() {
+          this.loading = true;
+          this.error = '';
+          try {
+            const [booksRes, copiesRes, checkoutsRes, reviewsRes] = await Promise.all([
+              this.supabase.from('books').select('*').order('title'),
+              this.supabase.from('book_copies').select('*'),
+              this.supabase.from('checkouts').select('*').is('returned_at', null),
+              this.supabase.from('reviews').select('title_key, rating'),
+            ]);
+            if (booksRes.error) throw booksRes.error;
+            if (copiesRes.error) throw copiesRes.error;
+            if (checkoutsRes.error) throw checkoutsRes.error;
+
+            const allReviews = reviewsRes.data || [];
+            this.books = booksRes.data.map(book => {
+              const bookCopies = copiesRes.data.filter(c => c.book_id === book.id).map(copy => {
+                const checkout = checkoutsRes.data.find(ch => ch.copy_id === copy.id) || null;
+                return { ...copy, available: !checkout, checkout };
+              });
+              const tk = (book.title_key || book.title.toLowerCase().trim());
+              const bookReviews = allReviews.filter(r => r.title_key === tk);
+              const avgRating = bookReviews.length
+                ? bookReviews.reduce((s, r) => s + r.rating, 0) / bookReviews.length
+                : 0;
+              return { ...book, copies: bookCopies, title_key: tk, avgRating, reviewCount: bookReviews.length };
+            });
+          } catch (e) {
+            this.error = 'Failed to load books: ' + e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        get filteredBooks() {
+          return this.books.filter(book => {
+            const q = this.search.toLowerCase();
+            const matchSearch = !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q);
+            const matchCategory = !this.filterCategory || book.category === this.filterCategory;
+            const matchLocation = !this.filterLocation || book.location === this.filterLocation;
+            const hasAvailable = book.copies.some(c => c.available);
+            const hasCheckedOut = book.copies.some(c => !c.available);
+            const matchStatus = !this.filterStatus ||
+              (this.filterStatus === 'available' && hasAvailable) ||
+              (this.filterStatus === 'checked_out' && hasCheckedOut);
+            return matchSearch && matchCategory && matchLocation && matchStatus;
+          });
+        },
+
+        get categories() {
+          return [...new Set(this.books.map(b => b.category).filter(Boolean))].sort();
+        },
+
+        dueDate() {
+          const d = new Date();
+          d.setDate(d.getDate() + this.loanDays);
+          return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        formatDate(dateStr) {
+          if (!dateStr) return '';
+          return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        isOverdue(dateStr) {
+          if (!dateStr) return false;
+          return new Date(dateStr) < new Date();
+        },
+
+        openCheckout(book) {
+          const available = book.copies.filter(c => c.available);
+          this.checkoutModal = {
+            open: true, book, name: '', email: '', error: '', loading: false,
+            availableCopies: available,
+            selectedCopyId: available[0]?.id || null
+          };
+        },
+
+        openCheckin(book) {
+          const checkedOut = book.copies.filter(c => !c.available);
+          this.checkinModal = { open: true, book, checkedOutCopies: checkedOut, error: '' };
+        },
+
+        async submitCheckout() {
+          const m = this.checkoutModal;
+          if (!m.name.trim()) { m.error = 'Please enter your name.'; return; }
+          if (!m.email.trim() || !m.email.includes('@')) { m.error = 'Please enter a valid email.'; return; }
+          m.error = '';
+          m.loading = true;
+
+          const copyId = m.availableCopies.length === 1 ? m.availableCopies[0].id : m.selectedCopyId;
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + this.loanDays);
+
+          try {
+            const { error } = await this.supabase.from('checkouts').insert({
+              copy_id: copyId,
+              book_id: m.book.id,
+              borrower_name: m.name.trim(),
+              borrower_email: m.email.trim().toLowerCase(),
+              checkout_date: new Date().toISOString(),
+              due_date: dueDate.toISOString(),
+            });
+            if (error) throw error;
+            m.open = false;
+            this.showToast('Book checked out successfully!', 'success');
+            await this.loadBooks();
+          } catch (e) {
+            m.error = 'Checkout failed: ' + e.message;
+          } finally {
+            m.loading = false;
+          }
+        },
+
+        async submitCheckin(copy) {
+          try {
+            const { data: updated, error } = await this.supabase.from('checkouts')
+              .update({ returned_at: new Date().toISOString() })
+              .eq('copy_id', copy.id)
+              .is('returned_at', null)
+              .select().single();
+            if (error) throw error;
+            this.checkinModal.open = false;
+            await this.loadBooks();
+            const returnedBook = this.checkinModal.book;
+            this.reviewModal = {
+              open: true,
+              bookId: copy.checkout?.book_id || updated?.book_id,
+              titleKey: returnedBook?.title_key || returnedBook?.title?.toLowerCase().trim() || '',
+              bookTitle: returnedBook?.title || '',
+              checkoutId: updated?.id || null,
+              borrowerName: copy.checkout?.borrower_name || '',
+              rating: 0,
+              text: ''
+            };
+          } catch (e) {
+            this.checkinModal.error = 'Return failed: ' + e.message;
+          }
+        },
+
+        skipReview() {
+          this.reviewModal.open = false;
+          this.showToast('Book returned successfully!', 'success');
+        },
+
+        async submitReview() {
+          const m = this.reviewModal;
+          if (!m.rating) return;
+          try {
+            const { error } = await this.supabase.from('reviews').insert({
+              book_id: m.bookId,
+              title_key: m.titleKey,
+              checkout_id: m.checkoutId,
+              borrower_name: m.borrowerName || 'Anonymous',
+              rating: m.rating,
+              review_text: m.text.trim() || null,
+            });
+            if (error) throw error;
+            m.open = false;
+            this.showToast('Thanks for your review!', 'success');
+            await this.loadBooks();
+          } catch (e) {
+            this.showToast('Could not save review: ' + e.message, 'error');
+          }
+        },
+
+        async openReviews(book) {
+          const tk = book.title_key || book.title.toLowerCase().trim();
+          const { data } = await this.supabase
+            .from('reviews').select('*').eq('title_key', tk).order('created_at', { ascending: false });
+          const reviews = data || [];
+          const avg = reviews.length ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
+          this.reviewsModal = { open: true, bookId: book.id, bookTitle: book.title, reviews, avg };
+        },
+
+        showToast(message, type = 'success') {
+          this.toast = { show: true, message, type };
+          setTimeout(() => { this.toast.show = false; }, 3500);
+        }
+      };
+    }
+  </script>
+</body>
+</html>

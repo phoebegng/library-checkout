@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Arthrex Learning Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="adminApp()" x-init="init()">
+
+  <!-- PIN Lock Screen -->
+  <div x-show="!unlocked" x-cloak class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900">Admin Access</h2>
+        <p class="text-sm text-gray-500 mt-1">Enter your PIN to continue</p>
+      </div>
+      <form @submit.prevent="checkPin">
+        <input
+          type="password"
+          x-model="pinInput"
+          x-ref="pinField"
+          placeholder="Enter PIN"
+          class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+          autocomplete="off"
+        />
+        <p x-show="pinError" class="text-red-500 text-sm text-center mb-3" x-text="pinError"></p>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors">
+          Unlock
+        </button>
+      </form>
+      <div class="mt-4 text-center">
+        <a href="index.html" class="text-sm text-gray-400 hover:text-gray-600">← Back to Catalog</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">📚</span>
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Arthrex Learning Library</h1>
+          <p class="text-xs text-gray-500">Admin Panel</p>
+        </div>
+      </div>
+      <nav class="flex gap-2">
+        <a href="index.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Catalog</a>
+        <a href="admin.html" class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg">Admin</a>
+        <a href="settings.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 py-8">
+
+    <!-- Tabs -->
+    <div class="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+      <button @click="activeTab = 'books'" :class="activeTab === 'books' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Books</button>
+      <button @click="activeTab = 'checkouts'" :class="activeTab === 'checkouts' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Active Checkouts</button>
+      <button @click="activeTab = 'history'" :class="activeTab === 'history' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">History</button>
+      <button @click="activeTab = 'overdue'" :class="activeTab === 'overdue' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">
+        Overdue
+        <span x-show="overdueCount > 0" x-text="overdueCount"
+          class="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5"></span>
+      </button>
+    </div>
+
+    <!-- Error -->
+    <div x-show="error" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 text-sm mb-4" x-text="error"></div>
+
+    <!-- BOOKS TAB -->
+    <div x-show="activeTab === 'books'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Book Catalog</h2>
+        <button @click="openAddBook()"
+          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add Book
+        </button>
+      </div>
+
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+
+      <div x-show="!loading" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Copy Codes</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Title</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Author</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Category</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Location</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Available</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="book in books" :key="book.id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap gap-1">
+                    <template x-for="copy in book.copies" :key="copy.id">
+                      <span x-text="copy.copy_code || '—'"
+                        :class="copy.checked_out
+                          ? 'bg-red-100 text-red-700 ring-1 ring-red-300'
+                          : 'bg-green-50 text-green-700 ring-1 ring-green-200'"
+                        :title="copy.checked_out ? 'Checked out' : 'Available'"
+                        class="font-mono text-xs px-2 py-1 rounded"></span>
+                    </template>
+                  </div>
+                </td>
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="book.title"></td>
+                <td class="px-4 py-3 text-gray-600" x-text="book.author"></td>
+                <td class="px-4 py-3">
+                  <span x-show="book.category" x-text="book.category"
+                    class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100"></span>
+                </td>
+                <td class="px-4 py-3">
+                  <span x-show="book.location" x-text="book.location"
+                    :class="book.location === 'ACT' ? 'bg-purple-100 text-purple-700 border-purple-200' : 'bg-indigo-100 text-indigo-700 border-indigo-200'"
+                    class="px-2 py-0.5 text-xs rounded-full border font-semibold"></span>
+                </td>
+                <td class="px-4 py-3">
+                  <span :class="book.available_count > 0 ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'"
+                    class="px-2 py-0.5 text-xs rounded-full border font-medium"
+                    x-text="book.available_count + ' / ' + book.total_copies"></span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex gap-2 justify-end items-center">
+                    <button @click="openEditBook(book)" title="Edit"
+                      class="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                    </button>
+                    <button @click="duplicateBook(book)" title="Duplicate"
+                      class="text-green-600 hover:text-green-800 p-1.5 rounded hover:bg-green-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                      </svg>
+                    </button>
+                    <button @click="confirmDeleteBook(book)" title="Delete"
+                      class="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="books.length === 0">
+              <td colspan="6" class="px-4 py-8 text-center text-gray-400">No books yet. Add your first book!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ACTIVE CHECKOUTS TAB -->
+    <div x-show="activeTab === 'checkouts'">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Active Checkouts</h2>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Book</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Borrower</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Email</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Checked Out</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Due Date</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="ch in activeCheckouts" :key="ch.id">
+              <tr class="hover:bg-gray-50" :class="isOverdue(ch.due_date) ? 'bg-red-50' : ''">
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="ch.book_title"></td>
+                <td class="px-4 py-3 text-gray-700" x-text="ch.borrower_name"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="ch.borrower_email"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatDate(ch.checkout_date)"></td>
+                <td class="px-4 py-3">
+                  <span :class="isOverdue(ch.due_date) ? 'text-red-600 font-semibold' : 'text-gray-600'"
+                    x-text="formatDate(ch.due_date) + (isOverdue(ch.due_date) ? ' ⚠ OVERDUE' : '')"></span>
+                </td>
+                <td class="px-4 py-3 text-right">
+                  <button @click="adminCheckin(ch)"
+                    class="text-green-600 hover:text-green-800 text-xs font-medium px-2 py-1 rounded hover:bg-green-50">Mark Returned</button>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="activeCheckouts.length === 0">
+              <td colspan="6" class="px-4 py-8 text-center text-gray-400">No active checkouts.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- HISTORY TAB -->
+    <div x-show="activeTab === 'history'">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">Checkout History</h2>
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Book</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Borrower</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Checked Out</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Returned</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="ch in allCheckouts" :key="ch.id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="ch.book_title"></td>
+                <td class="px-4 py-3 text-gray-700" x-text="ch.borrower_name"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="formatDate(ch.checkout_date)"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="ch.returned_at ? formatDate(ch.returned_at) : '—'"></td>
+                <td class="px-4 py-3">
+                  <span :class="ch.returned_at ? 'bg-gray-100 text-gray-600' : (isOverdue(ch.due_date) ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700')"
+                    class="px-2 py-0.5 text-xs rounded-full font-medium"
+                    x-text="ch.returned_at ? 'Returned' : (isOverdue(ch.due_date) ? 'Overdue' : 'Out')"></span>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="allCheckouts.length === 0">
+              <td colspan="5" class="px-4 py-8 text-center text-gray-400">No checkout history yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- OVERDUE TAB -->
+    <div x-show="activeTab === 'overdue'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Overdue Books</h2>
+        <button @click="sendOverdueEmails()" :disabled="sendingEmails || overdueCount === 0"
+          class="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+          </svg>
+          <span x-show="!sendingEmails">Send Reminder Emails</span>
+          <span x-show="sendingEmails">Sending...</span>
+        </button>
+      </div>
+      <div x-show="emailResult" class="mb-4 p-3 rounded-lg text-sm"
+        :class="emailResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'"
+        x-text="emailResult.message"></div>
+
+      <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Book</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Borrower</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Email</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Due Date</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Days Overdue</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="ch in overdueCheckouts" :key="ch.id">
+              <tr class="bg-red-50 hover:bg-red-100">
+                <td class="px-4 py-3 font-medium text-gray-900" x-text="ch.book_title"></td>
+                <td class="px-4 py-3 text-gray-700" x-text="ch.borrower_name"></td>
+                <td class="px-4 py-3 text-gray-500 text-xs" x-text="ch.borrower_email"></td>
+                <td class="px-4 py-3 text-red-600 font-medium" x-text="formatDate(ch.due_date)"></td>
+                <td class="px-4 py-3 text-red-600 font-semibold" x-text="daysOverdue(ch.due_date) + ' days'"></td>
+              </tr>
+            </template>
+            <tr x-show="overdueCheckouts.length === 0">
+              <td colspan="5" class="px-4 py-8 text-center text-gray-400">No overdue books!</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Book Modal -->
+  <div x-show="bookModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click.self="if(bookModal.scannerOpen) toggleScanner(); bookModal.open = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 max-h-screen overflow-y-auto">
+      <h2 class="text-lg font-bold text-gray-900 mb-4" x-text="bookModal.editId ? 'Edit Book' : 'Add New Book'"></h2>
+
+      <!-- Barcode Scanner -->
+      <div x-show="!bookModal.editId" class="mb-3">
+        <div class="flex gap-2">
+          <div class="relative flex-1">
+            <input type="text" x-model="bookModal.isbnScan" placeholder="Scan or type ISBN..."
+              @keydown.enter.prevent="lookupIsbn(bookModal.isbnScan)"
+              @input.debounce.500="if(bookModal.isbnScan.length >= 10) lookupIsbn(bookModal.isbnScan)"
+              class="w-full border border-blue-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-8" />
+            <span x-show="bookModal.isbnLoading" class="absolute right-2 top-2.5 animate-spin text-blue-500">⟳</span>
+          </div>
+          <button type="button" @click="toggleScanner()"
+            class="flex items-center gap-1.5 px-3 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-300 text-blue-700 rounded-lg text-sm font-medium">
+            &#x1F4F7;
+            <span x-text="bookModal.scannerOpen ? 'Close' : 'Camera'"></span>
+          </button>
+        </div>
+        <div x-show="bookModal.scannerOpen" class="mt-2 rounded-lg overflow-hidden border border-gray-200">
+          <div x-show="bookModal.cameras.length > 1" class="p-2 bg-gray-50 border-b border-gray-200">
+            <select x-model="bookModal.selectedCamera" @change="switchCamera()"
+              class="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <template x-for="cam in bookModal.cameras" :key="cam.id">
+                <option :value="cam.id" x-text="cam.label || 'Camera'"></option>
+              </template>
+            </select>
+          </div>
+          <div id="isbn-scanner" class="w-full"></div>
+        </div>
+        <p x-show="bookModal.isbnError" class="text-red-500 text-xs mt-1" x-text="bookModal.isbnError"></p>
+        <p x-show="bookModal.isbnSuccess" class="text-green-600 text-xs mt-1">✓ Book info filled in from ISBN lookup</p>
+      </div>
+
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+            <input type="text" x-model="bookModal.form.title" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Author <span class="text-red-500">*</span></label>
+            <input type="text" x-model="bookModal.form.author" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
+            <input type="text" x-model="bookModal.form.isbn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select x-show="!bookModal.addingCategory" x-model="bookModal.form.category"
+              @change="if(bookModal.form.category === '__new__') { bookModal.addingCategory = true; bookModal.form.category = ''; }"
+              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">Select category...</option>
+              <template x-for="cat in categoryList" :key="cat">
+                <option :value="cat" x-text="cat"></option>
+              </template>
+              <option value="__new__">+ Add new category...</option>
+            </select>
+            <div x-show="bookModal.addingCategory" class="flex gap-2">
+              <input type="text" x-model="bookModal.form.category" placeholder="New category name"
+                x-ref="newCatInput"
+                class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <button type="button" @click="bookModal.addingCategory = false"
+                class="text-xs px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">Cancel</button>
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Location <span class="text-red-500">*</span></label>
+            <select x-model="bookModal.form.location" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+              <option value="">Select location...</option>
+              <option value="ACT">ACT</option>
+              <option value="ACTS">ACTS</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Number of Copies <span class="text-red-500">*</span></label>
+            <input type="number" min="1" x-model="bookModal.form.total_copies" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cover Image URL</label>
+            <input type="url" x-model="bookModal.form.cover_url" placeholder="https://..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
+        </div>
+
+        <div x-show="bookModal.form.cover_url" class="mt-4 flex flex-col items-center">
+          <p class="text-xs text-gray-500 mb-1">Cover Preview</p>
+          <img :src="bookModal.form.cover_url" alt="Book cover preview"
+            class="h-48 w-auto rounded-lg border border-gray-200 object-cover shadow-sm"
+            @error="$el.style.display='none'"
+            @load="$el.style.display=''" />
+        </div>
+      </div>
+
+      <p x-show="bookModal.error" class="text-red-500 text-xs mt-3" x-text="bookModal.error"></p>
+
+      <div class="mt-5 flex gap-3">
+        <button @click="bookModal.open = false"
+          class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button @click="saveBook()" :disabled="bookModal.loading"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+          <span x-show="!bookModal.loading" x-text="bookModal.editId ? 'Save Changes' : 'Add Book'"></span>
+          <span x-show="bookModal.loading">Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div x-show="deleteModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-lg font-bold text-gray-900 mb-2">Delete Book?</h2>
+      <p class="text-sm text-gray-600 mb-1">Are you sure you want to delete <strong x-text="deleteModal.book?.title"></strong>?</p>
+      <p class="text-xs text-red-500">This will also delete all associated copies and checkout records.</p>
+      <div class="mt-5 flex gap-3">
+        <button @click="deleteModal.open = false"
+          class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button @click="deleteBook()" :disabled="deleteModal.loading"
+          class="flex-1 bg-red-600 hover:bg-red-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+          <span x-show="!deleteModal.loading">Delete</span>
+          <span x-show="deleteModal.loading">Deleting...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak x-transition
+    class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white"
+    :class="toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'"
+    x-text="toast.message"></div>
+
+  <script>
+    function adminApp() {
+      return {
+        unlocked: false,
+        pinInput: '',
+        pinError: '',
+
+        checkPin() {
+          const correct = window.ADMIN_PIN || '1234';
+          if (this.pinInput === correct) {
+            this.unlocked = true;
+            sessionStorage.setItem('admin_unlocked', '1');
+          } else {
+            this.pinError = 'Incorrect PIN. Please try again.';
+            this.pinInput = '';
+            this.$nextTick(() => this.$refs.pinField.focus());
+          }
+        },
+
+        activeTab: 'books',
+        books: [],
+        activeCheckouts: [],
+        allCheckouts: [],
+        overdueCheckouts: [],
+        loading: true,
+        error: '',
+        sendingEmails: false,
+        emailResult: null,
+        toast: { show: false, message: '', type: 'success' },
+        supabase: null,
+        bookModal: { open: false, editId: null, form: {}, error: '', loading: false, addingCategory: false, isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: '' },
+        _scanner: null,
+        _lastLookupId: 0,
+
+        get categoryList() {
+          const cats = this.books.map(b => b.category).filter(Boolean);
+          return [...new Set(cats)].sort();
+        },
+        deleteModal: { open: false, book: null, loading: false },
+
+        async init() {
+          if (sessionStorage.getItem('admin_unlocked') === '1') {
+            this.unlocked = true;
+          }
+          if (!window.SUPABASE_URL || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            this.error = 'Supabase is not configured. Please edit config.js.';
+            this.loading = false;
+            return;
+          }
+          this.supabase = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+          await this.loadAll();
+        },
+
+        async loadAll() {
+          this.loading = true;
+          try {
+            const [booksRes, copiesRes, checkoutsRes] = await Promise.all([
+              this.supabase.from('books').select('*').order('title'),
+              this.supabase.from('book_copies').select('*'),
+              this.supabase.from('checkouts').select('*, books(title)').order('checkout_date', { ascending: false }),
+            ]);
+            if (booksRes.error) throw booksRes.error;
+            if (copiesRes.error) throw copiesRes.error;
+            if (checkoutsRes.error) throw checkoutsRes.error;
+
+            const copies = copiesRes.data;
+            const checkouts = checkoutsRes.data;
+
+            const activeCopyIds = new Set(checkouts.filter(ch => !ch.returned_at).map(ch => ch.copy_id));
+            this.books = booksRes.data.map(book => {
+              const bookCopies = copies.filter(c => c.book_id === book.id).map(c => ({
+                ...c,
+                checked_out: activeCopyIds.has(c.id)
+              }));
+              const activeForBook = bookCopies.filter(c => c.checked_out);
+              return {
+                ...book,
+                copies: bookCopies,
+                available_count: bookCopies.length - activeForBook.length
+              };
+            });
+
+            this.allCheckouts = checkouts.map(ch => ({ ...ch, book_title: ch.books?.title || '—' }));
+            this.activeCheckouts = this.allCheckouts.filter(ch => !ch.returned_at);
+            this.overdueCheckouts = this.activeCheckouts.filter(ch => this.isOverdue(ch.due_date));
+          } catch (e) {
+            this.error = 'Failed to load data: ' + e.message;
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        get overdueCount() {
+          return this.overdueCheckouts.length;
+        },
+
+        isOverdue(dateStr) {
+          if (!dateStr) return false;
+          return new Date(dateStr) < new Date();
+        },
+
+        daysOverdue(dateStr) {
+          const diff = new Date() - new Date(dateStr);
+          return Math.floor(diff / (1000 * 60 * 60 * 24));
+        },
+
+        async lookupIsbn(rawIsbn) {
+          const isbn = (rawIsbn || '').replace(/[^0-9X]/gi, '');
+          if (isbn.length < 10) return;
+          const thisId = ++this._lastLookupId;
+          const m = this.bookModal;
+          m.isbnLoading = true;
+          m.isbnError = '';
+          m.isbnSuccess = false;
+
+          const stripHttp = url => url ? url.replace(/^http:/, 'https:') : '';
+          const mergeBook = (base, patch) => ({
+            title: patch.title || base.title,
+            author: patch.author || base.author,
+            isbn: patch.isbn || base.isbn,
+            cover_url: patch.cover_url || base.cover_url,
+            category: patch.category || base.category
+          });
+
+          try {
+            let book = null;
+
+            // Try Open Library first
+            try {
+              const olRes = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + isbn + '&format=json&jscmd=data');
+              const olData = await olRes.json();
+              const olBook = olData['ISBN:' + isbn];
+              if (olBook) {
+                book = {
+                  title: olBook.title,
+                  author: olBook.authors?.map(a => a.name).join(', '),
+                  isbn: isbn,
+                  cover_url: olBook.cover?.large || olBook.cover?.medium || '',
+                  category: (olBook.subjects?.map(s => s.name || s).filter(Boolean) || [])[0] || ''
+                };
+              }
+            } catch (olErr) {}
+
+            // Fall back to Google Books if Open Library was missing or incomplete
+            if (!book || !book.title) {
+              const key = window.GOOGLE_BOOKS_API_KEY || '';
+              const gbUrl = 'https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn + (key ? '&key=' + key : '');
+              const gbRes = await fetch(gbUrl);
+              const gbData = await gbRes.json();
+              const vi = gbData.items?.[0]?.volumeInfo;
+              if (vi && vi.title) {
+                const ids = vi.industryIdentifiers || [];
+                const isbn13 = ids.find(i => i.type === 'ISBN_13')?.identifier;
+                const isbn10 = ids.find(i => i.type === 'ISBN_10')?.identifier;
+                book = mergeBook(book || {}, {
+                  title: vi.title + (vi.subtitle ? ' - ' + vi.subtitle : ''),
+                  author: (vi.authors || []).join(', '),
+                  isbn: isbn13 || isbn10 || isbn,
+                  cover_url: stripHttp(vi.imageLinks?.thumbnail) || stripHttp(vi.imageLinks?.smallThumbnail),
+                  category: (vi.categories || [])[0] || ''
+                });
+              }
+            }
+
+            if (!book || !book.title) {
+              if (thisId === this._lastLookupId) {
+                m.isbnError = 'No book found for that ISBN.';
+              }
+              return;
+            }
+
+            if (thisId === this._lastLookupId) {
+              m.form.title = book.title || m.form.title;
+              m.form.author = book.author || m.form.author;
+              m.form.isbn = book.isbn || isbn;
+              m.form.cover_url = book.cover_url || m.form.cover_url || '';
+              if (book.category && !m.form.category) m.form.category = book.category;
+              m.isbnSuccess = true;
+              if (m.scannerOpen) this.toggleScanner();
+            }
+          } catch (e) {
+            if (thisId === this._lastLookupId) {
+              m.isbnError = 'Lookup failed. Check your connection.';
+            }
+          } finally {
+            if (thisId === this._lastLookupId) {
+              m.isbnLoading = false;
+            }
+          }
+        },
+
+        async toggleScanner() {
+          const m = this.bookModal;
+          if (m.scannerOpen) {
+            if (this._scanner) {
+              const s = this._scanner;
+              this._scanner = null;
+              await s.stop().catch(() => {});
+              await s.clear().catch(() => {});
+            }
+            m.scannerOpen = false;
+          } else {
+            m.scannerOpen = true;
+            m.isbnError = '';
+            m.isbnSuccess = false;
+            this.$nextTick(async () => {
+              this._scanner = new Html5Qrcode('isbn-scanner');
+              try {
+                const cameras = await Html5Qrcode.getCameras();
+                if (!cameras || cameras.length === 0) throw new Error('No cameras found.');
+                this.bookModal.cameras = cameras;
+                const envCam = cameras.find(c => (c.label || '').toLowerCase().includes('back'))
+                  || cameras.find(c => (c.label || '').toLowerCase().includes('rear'))
+                  || cameras[cameras.length - 1]
+                  || cameras[0];
+                this.bookModal.selectedCamera = envCam.id;
+                await this._scanner.start(
+                  { deviceId: { exact: envCam.id } },
+                  { fps: 10, qrbox: { width: 280, height: 120 } },
+                  (decodedText) => {
+                    m.isbnScan = decodedText;
+                    this.lookupIsbn(decodedText);
+                  },
+                  () => {}
+                );
+              } catch (err) {
+                m.isbnError = 'Camera failed: ' + err.message;
+                m.scannerOpen = false;
+              }
+            });
+          }
+        },
+
+        async switchCamera() {
+          if (!this._scanner || !this.bookModal.selectedCamera) return;
+          const m = this.bookModal;
+          m.isbnError = '';
+          try {
+            const s = this._scanner;
+            this._scanner = null;
+            await s.stop().catch(() => {});
+            await s.clear().catch(() => {});
+            this._scanner = new Html5Qrcode('isbn-scanner');
+            await this._scanner.start(
+              { deviceId: { exact: m.selectedCamera } },
+              { fps: 10, qrbox: { width: 280, height: 120 } },
+              (decodedText) => {
+                m.isbnScan = decodedText;
+                this.lookupIsbn(decodedText);
+              },
+              () => {}
+            );
+          } catch (err) {
+            m.isbnError = 'Camera switch failed: ' + err.message;
+          }
+        },
+
+        formatDate(dateStr) {
+          if (!dateStr) return '';
+          return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        },
+
+        openAddBook() {
+          if (this._scanner) { this._scanner.stop().catch(() => {}); this._scanner = null; }
+          this.bookModal = {
+            open: true, editId: null,
+            form: { title: '', author: '', isbn: '', category: '', location: '', total_copies: 1, cover_url: '' },
+            error: '', loading: false, addingCategory: false,
+            isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: ''
+          };
+        },
+
+        openEditBook(book) {
+          this.bookModal = {
+            open: true, editId: book.id,
+            form: { title: book.title, author: book.author, isbn: book.isbn || '', category: book.category || '', location: book.location || '', total_copies: book.total_copies, cover_url: book.cover_url || '' },
+            error: '', loading: false, addingCategory: false
+          };
+        },
+
+        async saveBook() {
+          const f = this.bookModal.form;
+          if (!f.title?.trim()) { this.bookModal.error = 'Title is required.'; return; }
+          if (!f.author?.trim()) { this.bookModal.error = 'Author is required.'; return; }
+          if (!f.total_copies || f.total_copies < 1) { this.bookModal.error = 'At least 1 copy required.'; return; }
+
+          this.bookModal.error = '';
+          this.bookModal.loading = true;
+
+          try {
+            const payload = {
+              title: f.title.trim(),
+              author: f.author.trim(),
+              isbn: f.isbn?.trim() || null,
+              category: f.category?.trim() || null,
+              location: f.location || null,
+              total_copies: parseInt(f.total_copies),
+              cover_url: f.cover_url?.trim() || null,
+              title_key: f.title?.toLowerCase().trim() || null,
+            };
+
+            if (this.bookModal.editId) {
+              // Update book
+              const { error } = await this.supabase.from('books').update(payload).eq('id', this.bookModal.editId);
+              if (error) throw error;
+
+              // Adjust copies count
+              const { data: existingCopies } = await this.supabase.from('book_copies').select('id').eq('book_id', this.bookModal.editId);
+              const currentCount = existingCopies?.length || 0;
+              const newCount = parseInt(f.total_copies);
+
+              if (newCount > currentCount) {
+                const toAdd = [];
+                for (let i = currentCount + 1; i <= newCount; i++) {
+                  toAdd.push({ book_id: this.bookModal.editId, copy_number: i });
+                }
+                const { error: addErr } = await this.supabase.from('book_copies').insert(toAdd);
+                if (addErr) throw addErr;
+              } else if (newCount < currentCount) {
+                // Remove copies from the end (only unoccupied ones)
+                const { data: activeCopies } = await this.supabase.from('checkouts').select('copy_id').eq('book_id', this.bookModal.editId).is('returned_at', null);
+                const activeCopyIds = new Set((activeCopies || []).map(c => c.copy_id));
+                const removable = existingCopies.filter(c => !activeCopyIds.has(c.id)).slice(0, currentCount - newCount);
+                for (const c of removable) {
+                  await this.supabase.from('book_copies').delete().eq('id', c.id);
+                }
+              }
+
+              this.showToast('Book updated!', 'success');
+            } else {
+              // Insert new book
+              const { data: newBook, error } = await this.supabase.from('books').insert(payload).select().single();
+              if (error) throw error;
+
+              // Create copies
+              const copiesData = [];
+              for (let i = 1; i <= parseInt(f.total_copies); i++) {
+                copiesData.push({ book_id: newBook.id, copy_number: i });
+              }
+              const { error: copyErr } = await this.supabase.from('book_copies').insert(copiesData);
+              if (copyErr) throw copyErr;
+
+              this.showToast('Book added!', 'success');
+            }
+
+            this.bookModal.open = false;
+            await this.loadAll();
+          } catch (e) {
+            this.bookModal.error = 'Failed to save: ' + e.message;
+          } finally {
+            this.bookModal.loading = false;
+          }
+        },
+
+        printLabel(book) {
+          const copies = book.copies || [];
+          const labels = copies.map(function(copy) {
+            return '<div class="label">' +
+              '<div class="code">' + (copy.copy_code || '\u2014') + '<\/div>' +
+              '<div class="title">' + book.title + '<\/div>' +
+              '<div class="author">' + book.author + '<\/div>' +
+              '<div class="org">Arthrex Learning Library<\/div>' +
+              '<\/div>';
+          }).join('');
+          const win = window.open('', '_blank', 'width=500,height=600');
+          var html = '<!DOCTYPE html><html><head><title>Book Labels<\/title>';
+          html += '<style>';
+          html += 'body { font-family: Arial, sans-serif; margin: 20px; background: #fff; }';
+          html += '.label { border: 2px solid #000; padding: 20px 28px; text-align: center; width: 280px; margin-bottom: 16px; page-break-inside: avoid; }';
+          html += '.code { font-size: 26px; font-weight: bold; font-family: monospace; letter-spacing: 2px; margin-bottom: 10px; }';
+          html += '.title { font-size: 13px; font-weight: bold; margin-bottom: 4px; }';
+          html += '.author { font-size: 11px; color: #555; }';
+          html += '.org { font-size: 10px; color: #999; margin-top: 10px; }';
+          html += '<\/style><\/head>';
+          html += '<body onload="window.print();window.close()">' + labels + '<\/body><\/html>';
+          win.document.write(html);
+          win.document.close();
+        },
+
+        async duplicateBook(book) {
+          try {
+            const { data: newBook, error: bookErr } = await this.supabase.from('books').insert({
+              title: book.title + ' (Copy)',
+              author: book.author,
+              isbn: book.isbn || null,
+              category: book.category || null,
+              location: book.location || null,
+              total_copies: book.total_copies,
+              cover_url: book.cover_url || null,
+            }).select().single();
+            if (bookErr) throw bookErr;
+            const copies = [];
+            for (let i = 1; i <= book.total_copies; i++) {
+              copies.push({ book_id: newBook.id, copy_number: i });
+            }
+            const { error: copyErr } = await this.supabase.from('book_copies').insert(copies);
+            if (copyErr) throw copyErr;
+            this.showToast('Book duplicated.', 'success');
+            await this.loadAll();
+          } catch (e) {
+            this.showToast('Duplicate failed: ' + e.message, 'error');
+          }
+        },
+
+        confirmDeleteBook(book) {
+          this.deleteModal = { open: true, book, loading: false };
+        },
+
+        async deleteBook() {
+          this.deleteModal.loading = true;
+          try {
+            const id = this.deleteModal.book.id;
+            await this.supabase.from('checkouts').delete().eq('book_id', id);
+            await this.supabase.from('book_copies').delete().eq('book_id', id);
+            const { error } = await this.supabase.from('books').delete().eq('id', id);
+            if (error) throw error;
+            this.deleteModal.open = false;
+            this.showToast('Book deleted.', 'success');
+            await this.loadAll();
+          } catch (e) {
+            this.error = 'Delete failed: ' + e.message;
+          } finally {
+            this.deleteModal.loading = false;
+          }
+        },
+
+        async adminCheckin(checkout) {
+          try {
+            const { error } = await this.supabase.from('checkouts')
+              .update({ returned_at: new Date().toISOString() })
+              .eq('id', checkout.id);
+            if (error) throw error;
+            this.showToast('Marked as returned!', 'success');
+            await this.loadAll();
+          } catch (e) {
+            this.error = 'Failed to mark returned: ' + e.message;
+          }
+        },
+
+        async sendOverdueEmails() {
+          this.sendingEmails = true;
+          this.emailResult = null;
+          try {
+            const fnUrl = window.SUPABASE_URL.replace('supabase.co', 'supabase.co') + '/functions/v1/send-overdue-emails';
+            const resp = await fetch(fnUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + window.SUPABASE_ANON_KEY
+              }
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || 'Unknown error');
+            this.emailResult = { success: true, message: 'Sent ' + data.sent + ' reminder email(s) successfully.' };
+          } catch (e) {
+            this.emailResult = { success: false, message: 'Failed to send emails: ' + e.message };
+          } finally {
+            this.sendingEmails = false;
+          }
+        },
+
+        showToast(message, type = 'success') {
+          this.toast = { show: true, message, type };
+          setTimeout(() => { this.toast.show = false; }, 3500);
+        }
+      };
+    }
+  </script>
+</body>
+</html>

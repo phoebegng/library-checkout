@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Settings — Arthrex Learning Library</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  <style>[x-cloak] { display: none !important; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen" x-data="settingsApp()" x-init="init()">
+
+  <!-- PIN Lock Screen -->
+  <div x-show="!unlocked" x-cloak class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm mx-4">
+      <div class="text-center mb-6">
+        <div class="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+          <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+          </svg>
+        </div>
+        <h2 class="text-xl font-bold text-gray-900">Settings Access</h2>
+        <p class="text-sm text-gray-500 mt-1">Enter your PIN to continue</p>
+      </div>
+      <form @submit.prevent="checkPin">
+        <input
+          type="password"
+          x-model="pinInput"
+          x-ref="pinField"
+          placeholder="Enter PIN"
+          class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+          autocomplete="off"
+        />
+        <p x-show="pinError" class="text-red-500 text-sm text-center mb-3" x-text="pinError"></p>
+        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors">
+          Unlock
+        </button>
+      </form>
+      <div class="mt-4 text-center">
+        <a href="index.html" class="text-sm text-gray-400 hover:text-gray-600">← Back to Catalog</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header class="bg-white border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <span class="text-3xl">📚</span>
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">Arthrex Learning Library</h1>
+          <p class="text-xs text-gray-500">Settings</p>
+        </div>
+      </div>
+      <nav class="flex gap-2">
+        <a href="index.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Catalog</a>
+        <a href="admin.html" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg">Admin</a>
+        <a href="settings.html" class="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg">Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="max-w-2xl mx-auto px-4 py-10">
+
+    <!-- Loan Period -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <h2 class="text-base font-semibold text-gray-900 mb-1">Loan Period</h2>
+      <p class="text-sm text-gray-500 mb-4">Default number of days a book can be checked out before it becomes overdue.</p>
+      <div class="flex items-center gap-3">
+        <input type="number" min="1" max="365" x-model="loanDays"
+          class="w-28 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <span class="text-sm text-gray-600">days</span>
+      </div>
+      <button @click="saveLoanDays()"
+        class="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+        Save Loan Period
+      </button>
+      <p x-show="loanSaved" class="text-green-600 text-xs mt-2">Saved!</p>
+    </div>
+
+    <!-- Supabase Config -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <h2 class="text-base font-semibold text-gray-900 mb-1">Supabase Configuration</h2>
+      <p class="text-sm text-gray-500 mb-4">These values must be set in <code class="bg-gray-100 px-1 rounded text-xs">config.js</code> — they cannot be changed here for security reasons.</p>
+      <div class="space-y-2 text-sm">
+        <div class="flex gap-2 items-center">
+          <span class="text-gray-500 w-36 shrink-0">Supabase URL:</span>
+          <code class="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700 truncate" x-text="supabaseUrl"></code>
+        </div>
+        <div class="flex gap-2 items-center">
+          <span class="text-gray-500 w-36 shrink-0">Anon Key:</span>
+          <code class="bg-gray-50 border border-gray-200 rounded px-2 py-1 text-xs text-gray-700">
+            <span x-text="supabaseKey ? supabaseKey.substring(0, 20) + '...' : 'Not set'"></span>
+          </code>
+        </div>
+      </div>
+    </div>
+
+    <!-- Email Configuration -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6 mb-6">
+      <h2 class="text-base font-semibold text-gray-900 mb-1">Email Configuration (Resend)</h2>
+      <p class="text-sm text-gray-500 mb-4">
+        Overdue reminder emails are sent via <strong>Resend</strong> — free, no IT setup, no passwords needed.
+      </p>
+      <div class="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800 space-y-2">
+        <p class="font-medium">One-time setup (~2 minutes):</p>
+        <ol class="list-decimal list-inside space-y-1 text-xs">
+          <li>Sign up free at <strong>resend.com</strong></li>
+          <li>Go to <strong>API Keys → Create API Key</strong> → copy the key</li>
+          <li>Go to <strong>Emails → Verify a sender address</strong> → enter and verify your email</li>
+        </ol>
+        <p class="font-medium mt-2">Then add these in Supabase Dashboard → Edge Functions → Secrets:</p>
+        <div class="bg-white rounded border border-amber-100 p-3 text-xs font-mono space-y-1">
+          <p>RESEND_API_KEY = re_xxxxxxxxxxxx</p>
+          <p>FROM_EMAIL     = your verified email address</p>
+        </div>
+        <p class="text-xs mt-1">Then deploy the Edge Function from the <code class="bg-amber-100 px-1 rounded">supabase/functions/send-overdue-emails/</code> folder.</p>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div class="bg-white rounded-xl border border-gray-200 p-6">
+      <h2 class="text-base font-semibold text-gray-900 mb-3">About</h2>
+      <div class="text-sm text-gray-500 space-y-1">
+        <p><strong class="text-gray-700">Arthrex Learning Library</strong> v1.0</p>
+        <p>Built with TailwindCSS, Alpine.js, and Supabase.</p>
+        <p>Default loan period: <strong x-text="loanDays + ' days'"></strong></p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Toast -->
+  <div x-show="toast.show" x-cloak x-transition
+    class="fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white bg-green-600"
+    x-text="toast.message"></div>
+
+  <script src="config.js"></script>
+  <script>
+    function settingsApp() {
+      return {
+        unlocked: false,
+        pinInput: '',
+        pinError: '',
+
+        checkPin() {
+          const correct = window.ADMIN_PIN || '1234';
+          if (this.pinInput === correct) {
+            this.unlocked = true;
+            sessionStorage.setItem('admin_unlocked', '1');
+          } else {
+            this.pinError = 'Incorrect PIN. Please try again.';
+            this.pinInput = '';
+            this.$nextTick(() => this.$refs.pinField.focus());
+          }
+        },
+
+        loanDays: 30,
+        loanSaved: false,
+        supabaseUrl: '',
+        supabaseKey: '',
+        toast: { show: false, message: '' },
+
+        init() {
+          if (sessionStorage.getItem('admin_unlocked') === '1') {
+            this.unlocked = true;
+          }
+          const saved = localStorage.getItem('loan_days');
+          if (saved) this.loanDays = parseInt(saved);
+          this.supabaseUrl = window.SUPABASE_URL || 'Not configured';
+          this.supabaseKey = window.SUPABASE_ANON_KEY || '';
+        },
+
+        saveLoanDays() {
+          localStorage.setItem('loan_days', this.loanDays);
+          this.loanSaved = true;
+          setTimeout(() => { this.loanSaved = false; }, 2000);
+        },
+      };
+    }
+  </script>
+</body>
+</html>
