@@ -253,21 +253,9 @@
 
     <!-- OVERDUE TAB -->
     <div x-show="activeTab === 'overdue'">
-      <div class="flex items-center justify-between mb-4">
+      <div class="mb-4">
         <h2 class="text-lg font-semibold text-gray-900">Overdue Books</h2>
-        <button @click="sendOverdueEmails()" :disabled="sendingEmails || overdueCount === 0"
-          class="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-          </svg>
-          <span x-show="!sendingEmails">Send Reminder Emails</span>
-          <span x-show="sendingEmails">Sending...</span>
-        </button>
       </div>
-      <div x-show="emailResult" class="mb-4 p-3 rounded-lg text-sm"
-        :class="emailResult.success ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'"
-        x-text="emailResult.message"></div>
-
       <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">

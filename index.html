@@ -41,7 +41,7 @@
         <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
         </svg>
-        <input type="text" placeholder="Search by title or author..." x-model="search"
+        <input type="text" placeholder="Search by title, author, or copy code..." x-model="search"
           class="w-full pl-9 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
       </div>
       <select x-model="filterCategory" class="px-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
@@ -257,7 +257,7 @@
       <p class="text-sm text-gray-500 mb-4" x-text="reviewModal.bookTitle"></p>
 
       <div class="mb-4">
-        <p class="text-sm font-medium text-gray-700 mb-2">Your rating <span class="text-gray-400">(optional)</span></p>
+        <p class="text-sm font-medium text-gray-700 mb-2">Your rating <span class="text-red-500">*</span></p>
         <div class="flex gap-1">
           <template x-for="star in [1,2,3,4,5]" :key="star">
             <button type="button" @click="reviewModal.rating = star"
@@ -275,6 +275,7 @@
           class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"></textarea>
       </div>
 
+      <p x-show="reviewModal.error" class="text-red-500 text-xs mt-2" x-text="reviewModal.error"></p>
       <div class="flex gap-3">
         <button @click="skipReview()"
           class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Skip</button>
@@ -343,7 +344,7 @@
         filterLocation: '',
         checkoutModal: { open: false, book: null, name: '', email: '', error: '', loading: false, availableCopies: [], selectedCopyId: null },
         checkinModal: { open: false, book: null, checkedOutCopies: [], error: '' },
-        reviewModal: { open: false, bookId: null, bookTitle: '', checkoutId: null, borrowerName: '', rating: 0, text: '' },
+        reviewModal: { open: false, bookId: null, titleKey: '', bookTitle: '', checkoutId: null, borrowerName: '', rating: 0, text: '', error: '' },
         reviewsModal: { open: false, bookId: null, bookTitle: '', reviews: [], avg: 0 },
         toast: { show: false, message: '', type: 'success' },
         supabase: null,
@@ -374,6 +375,7 @@
             if (booksRes.error) throw booksRes.error;
             if (copiesRes.error) throw copiesRes.error;
             if (checkoutsRes.error) throw checkoutsRes.error;
+            if (reviewsRes.error) throw reviewsRes.error;
 
             const allReviews = reviewsRes.data || [];
             this.books = booksRes.data.map(book => {
@@ -398,7 +400,8 @@
         get filteredBooks() {
           return this.books.filter(book => {
             const q = this.search.toLowerCase();
-            const matchSearch = !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q);
+            const copyCodeMatch = book.copies.some(c => (c.copy_code || '').toLowerCase().includes(q));
+            const matchSearch = !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q) || copyCodeMatch;
             const matchCategory = !this.filterCategory || book.category === this.filterCategory;
             const matchLocation = !this.filterLocation || book.location === this.filterLocation;
             const hasAvailable = book.copies.some(c => c.available);
@@ -485,12 +488,14 @@
             if (error) throw error;
             this.checkinModal.open = false;
             await this.loadBooks();
-            const returnedBook = this.checkinModal.book;
+            const bookId = copy.book_id || copy.checkout?.book_id || updated?.book_id;
+            const returnedBook = this.books.find(b => b.id === bookId) || this.checkinModal.book || {};
             this.reviewModal = {
               open: true,
-              bookId: copy.checkout?.book_id || updated?.book_id,
-              titleKey: returnedBook?.title_key || returnedBook?.title?.toLowerCase().trim() || '',
-              bookTitle: returnedBook?.title || '',
+              error: '',
+              bookId: bookId || returnedBook.id,
+              titleKey: returnedBook.title_key || returnedBook.title?.toLowerCase().trim() || '',
+              bookTitle: returnedBook.title || '',
               checkoutId: updated?.id || null,
               borrowerName: copy.checkout?.borrower_name || '',
               rating: 0,
@@ -508,7 +513,9 @@
 
         async submitReview() {
           const m = this.reviewModal;
-          if (!m.rating) return;
+          m.error = '';
+          if (!m.rating) { m.error = 'Please select a star rating.'; return; }
+          if (!m.titleKey) { m.error = 'Missing book information. Please return the book again.'; return; }
           try {
             const { error } = await this.supabase.from('reviews').insert({
               book_id: m.bookId,
@@ -523,7 +530,7 @@
             this.showToast('Thanks for your review!', 'success');
             await this.loadBooks();
           } catch (e) {
-            this.showToast('Could not save review: ' + e.message, 'error');
+            m.error = 'Could not save review: ' + e.message;
           }
         },
 
