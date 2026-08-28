@@ -15,4 +15,4 @@ window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXB
 
 // Admin PIN — protects the Admin and Settings pages.
 // Change this to any PIN or password you want.
-window.ADMIN_PIN = '1234';
+window.ADMIN_PIN = '26288';
