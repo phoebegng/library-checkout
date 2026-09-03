@@ -101,7 +101,8 @@
             <div class="absolute top-2 left-2 flex flex-wrap gap-1">
               <template x-for="cat in (book.categories?.length ? book.categories : (book.category ? [book.category] : []))" :key="cat">
                 <span x-text="cat"
-                  class="px-2 py-0.5 bg-white/80 backdrop-blur text-xs font-medium text-gray-700 rounded-full border border-gray-200"></span>
+                  class="px-2 py-0.5 text-xs font-medium rounded-full border backdrop-blur"
+                  :style="categoryStyle(cat)"></span>
               </template>
             </div>
             <!-- Location badge -->
@@ -197,8 +198,8 @@
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div>
-          <label class="block text-sm font-medium text-gray-700 mb-1">Your Email <span class="text-red-500">*</span></label>
-          <input type="email" x-model="checkoutModal.email" placeholder="jane.smith@company.com"
+          <label class="block text-sm font-medium text-gray-700 mb-1">Your Arthrex Email <span class="text-red-500">*</span></label>
+          <input type="email" x-model="checkoutModal.email" placeholder="jane.smith@arthrex.com"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
         </div>
         <div class="bg-blue-50 rounded-lg px-3 py-2 text-xs text-blue-700">
@@ -434,6 +435,12 @@
           return [...names].sort();
         },
 
+        categoryStyle(name) {
+          const cat = this.dbCategories.find(c => c.name === name);
+          const color = cat?.color || '#3b82f6';
+          return { backgroundColor: color + '20', color: color, borderColor: color + '40' };
+        },
+
         dueDate() {
           const d = new Date();
           d.setDate(d.getDate() + this.loanDays);
@@ -466,8 +473,9 @@
 
         async submitCheckout() {
           const m = this.checkoutModal;
+          const email = m.email.trim().toLowerCase();
           if (!m.name.trim()) { m.error = 'Please enter your name.'; return; }
-          if (!m.email.trim() || !m.email.includes('@')) { m.error = 'Please enter a valid email.'; return; }
+          if (!email || !email.endsWith('@arthrex.com')) { m.error = 'Please enter a valid @arthrex.com email.'; return; }
           m.error = '';
           m.loading = true;
 
@@ -480,7 +488,7 @@
               copy_id: copyId,
               book_id: m.book.id,
               borrower_name: m.name.trim(),
-              borrower_email: m.email.trim().toLowerCase(),
+              borrower_email: email,
               checkout_date: new Date().toISOString(),
               due_date: dueDate.toISOString(),
             });

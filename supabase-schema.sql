@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS books (
 CREATE TABLE IF NOT EXISTS categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
+  color TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
@@ -31,6 +32,9 @@ DO $$ BEGIN
     CREATE POLICY "Allow all on categories" ON categories FOR ALL USING (true) WITH CHECK (true);
   END IF;
 END $$;
+
+-- Add color column for existing categories installs
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS color TEXT;
 
 -- Individual physical copies of each book
 CREATE TABLE IF NOT EXISTS book_copies (
@@ -144,12 +148,12 @@ END $$;
 -- Sample data (optional — delete if not needed)
 -- ============================================================
 
-INSERT INTO categories (name) VALUES
-  ('Personal Development'),
-  ('Business'),
-  ('Productivity'),
-  ('Career'),
-  ('Leadership')
+INSERT INTO categories (name, color) VALUES
+  ('Personal Development', '#3b82f6'),
+  ('Business', '#10b981'),
+  ('Productivity', '#f59e0b'),
+  ('Career', '#8b5cf6'),
+  ('Leadership', '#ef4444')
 ON CONFLICT (name) DO NOTHING;
 
 INSERT INTO books (title, author, isbn, category, categories, location, total_copies) VALUES

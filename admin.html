@@ -69,6 +69,8 @@
     <div class="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
       <button @click="activeTab = 'books'" :class="activeTab === 'books' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
         class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Books</button>
+      <button @click="activeTab = 'categories'" :class="activeTab === 'categories' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Categories</button>
       <button @click="activeTab = 'checkouts'" :class="activeTab === 'checkouts' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
         class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Active Checkouts</button>
       <button @click="activeTab = 'history'" :class="activeTab === 'history' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
@@ -79,8 +81,6 @@
         <span x-show="overdueCount > 0" x-text="overdueCount"
           class="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5"></span>
       </button>
-      <button @click="activeTab = 'categories'" :class="activeTab === 'categories' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
-        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Categories</button>
     </div>
 
     <!-- Error -->
@@ -135,7 +135,8 @@
                   <div class="flex flex-wrap gap-1">
                     <template x-for="cat in (book.categories?.length ? book.categories : (book.category ? [book.category] : []))" :key="cat">
                       <span x-text="cat"
-                        class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100"></span>
+                        class="px-2 py-0.5 text-xs rounded-full border"
+                        :style="categoryStyle(cat)"></span>
                     </template>
                   </div>
                 </td>
@@ -308,6 +309,7 @@
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Color</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Name</th>
               <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
@@ -315,6 +317,10 @@
           <tbody class="divide-y divide-gray-100">
             <template x-for="cat in categories" :key="cat.id">
               <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3">
+                  <span class="inline-block w-5 h-5 rounded-full border border-gray-200"
+                    :style="{ backgroundColor: cat.color || '#3b82f6' }"></span>
+                </td>
                 <td class="px-4 py-3 text-gray-900" x-text="cat.name"></td>
                 <td class="px-4 py-3 text-right">
                   <div class="flex gap-2 justify-end items-center">
@@ -335,7 +341,7 @@
               </tr>
             </template>
             <tr x-show="categories.length === 0">
-              <td colspan="2" class="px-4 py-8 text-center text-gray-400">No categories yet.</td>
+              <td colspan="3" class="px-4 py-8 text-center text-gray-400">No categories yet.</td>
             </tr>
           </tbody>
         </table>
@@ -399,9 +405,10 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">Categories</label>
             <div class="flex flex-wrap gap-1 mb-2">
               <template x-for="cat in bookModal.form.categories" :key="cat">
-                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full border"
+                  :style="categoryStyle(cat)">
                   <span x-text="cat"></span>
-                  <button type="button" @click="bookModal.form.categories = bookModal.form.categories.filter(c => c !== cat)" class="text-blue-400 hover:text-blue-600 leading-none">&times;</button>
+                  <button type="button" @click="bookModal.form.categories = bookModal.form.categories.filter(c => c !== cat)" class="hover:opacity-80 leading-none">&times;</button>
                 </span>
               </template>
               <span x-show="!bookModal.form.categories.length" class="text-xs text-gray-400 italic">No categories selected</span>
@@ -413,14 +420,16 @@
               </button>
               <div x-show="bookModal.catOpen" @click.away="bookModal.catOpen = false"
                 class="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto p-2">
-                <template x-for="cat in categoryList" :key="cat">
+                <template x-for="cat in categories" :key="cat.id">
                   <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
-                    <input type="checkbox" :value="cat" x-model="bookModal.form.categories"
+                    <input type="checkbox" :value="cat.name" x-model="bookModal.form.categories"
                       class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    <span class="text-sm text-gray-700" x-text="cat"></span>
+                    <span class="inline-block w-3 h-3 rounded-full border border-gray-200"
+                      :style="{ backgroundColor: cat.color || '#3b82f6' }"></span>
+                    <span class="text-sm text-gray-700" x-text="cat.name"></span>
                   </label>
                 </template>
-                <p x-show="!categoryList.length" class="text-xs text-gray-400 px-2 py-1">No categories defined. Add them in the Categories tab.</p>
+                <p x-show="!categories.length" class="text-xs text-gray-400 px-2 py-1">No categories defined. Add them in the Categories tab.</p>
               </div>
             </div>
           </div>
@@ -476,6 +485,27 @@
           <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
           <input type="text" x-model="categoryModal.name"
             class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Color</label>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <template x-for="preset in ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#14b8a6']" :key="preset">
+              <button type="button" @click="categoryModal.color = preset"
+                class="w-8 h-8 rounded-full border-2 transition-all"
+                :class="categoryModal.color === preset ? 'border-gray-900 scale-110' : 'border-transparent hover:scale-105'"
+                :style="{ backgroundColor: preset }"
+                :title="preset"></button>
+            </template>
+            <button type="button" @click="categoryModal.color = ''"
+              class="w-8 h-8 rounded-full border-2 border-gray-300 bg-white text-xs text-gray-500 flex items-center justify-center transition-all"
+              :class="!categoryModal.color ? 'ring-2 ring-gray-400' : ''"
+              title="Default blue">None</button>
+          </div>
+          <div class="flex items-center gap-3">
+            <input type="color" x-model="categoryModal.color"
+              class="h-10 w-16 p-1 border border-gray-300 rounded-lg cursor-pointer bg-white" />
+            <span class="text-sm text-gray-500" x-text="categoryModal.color || 'Default blue'"></span>
+          </div>
         </div>
       </div>
       <p x-show="categoryModal.error" class="text-red-500 text-xs mt-3" x-text="categoryModal.error"></p>
@@ -548,13 +578,20 @@
         toast: { show: false, message: '', type: 'success' },
         supabase: null,
         bookModal: { open: false, editId: null, form: { title: '', author: '', isbn: '', categories: [], location: '', total_copies: 1, cover_url: '' }, error: '', loading: false, catOpen: false, isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: '' },
-        categoryModal: { open: false, editId: null, name: '', error: '', loading: false },
+        categoryModal: { open: false, editId: null, name: '', color: '', error: '', loading: false },
         _scanner: null,
         _lastLookupId: 0,
 
         get categoryList() {
           return this.categories.map(c => c.name).sort();
         },
+
+        categoryStyle(name) {
+          const cat = this.categories.find(c => c.name === name);
+          const color = cat?.color || '#3b82f6';
+          return { backgroundColor: color + '20', color: color, borderColor: color + '40' };
+        },
+
         deleteModal: { open: false, book: null, loading: false },
 
         async init() {
@@ -991,11 +1028,11 @@
         },
 
         openAddCategory() {
-          this.categoryModal = { open: true, editId: null, name: '', error: '', loading: false };
+          this.categoryModal = { open: true, editId: null, name: '', color: '', error: '', loading: false };
         },
 
         openEditCategory(cat) {
-          this.categoryModal = { open: true, editId: cat.id, name: cat.name, error: '', loading: false };
+          this.categoryModal = { open: true, editId: cat.id, name: cat.name, color: cat.color || '', error: '', loading: false };
         },
 
         async saveCategory() {
@@ -1005,11 +1042,12 @@
           m.error = '';
           m.loading = true;
           try {
+            const color = m.color || null;
             if (m.editId) {
-              const { error } = await this.supabase.from('categories').update({ name }).eq('id', m.editId);
+              const { error } = await this.supabase.from('categories').update({ name, color }).eq('id', m.editId);
               if (error) throw error;
             } else {
-              const { error } = await this.supabase.from('categories').insert({ name });
+              const { error } = await this.supabase.from('categories').insert({ name, color });
               if (error) throw error;
             }
             m.open = false;
