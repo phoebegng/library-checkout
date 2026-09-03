@@ -97,9 +97,13 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
               </svg>
             </template>
-            <!-- Category badge -->
-            <span x-show="book.category" x-text="book.category"
-              class="absolute top-2 left-2 px-2 py-0.5 bg-white/80 backdrop-blur text-xs font-medium text-gray-700 rounded-full border border-gray-200"></span>
+            <!-- Category badges -->
+            <div class="absolute top-2 left-2 flex flex-wrap gap-1">
+              <template x-for="cat in (book.categories?.length ? book.categories : (book.category ? [book.category] : []))" :key="cat">
+                <span x-text="cat"
+                  class="px-2 py-0.5 bg-white/80 backdrop-blur text-xs font-medium text-gray-700 rounded-full border border-gray-200"></span>
+              </template>
+            </div>
             <!-- Location badge -->
             <span x-show="book.location" x-text="book.location"
               :class="book.location === 'ACT' ? 'bg-purple-600 text-white' : 'bg-indigo-600 text-white'"
@@ -342,6 +346,7 @@
         filterCategory: '',
         filterStatus: '',
         filterLocation: '',
+        dbCategories: [],
         checkoutModal: { open: false, book: null, name: '', email: '', error: '', loading: false, availableCopies: [], selectedCopyId: null },
         checkinModal: { open: false, book: null, checkedOutCopies: [], error: '' },
         reviewModal: { open: false, bookId: null, titleKey: '', bookTitle: '', checkoutId: null, borrowerName: '', rating: 0, text: '', error: '' },
@@ -366,18 +371,21 @@
           this.loading = true;
           this.error = '';
           try {
-            const [booksRes, copiesRes, checkoutsRes, reviewsRes] = await Promise.all([
+            const [booksRes, copiesRes, checkoutsRes, reviewsRes, categoriesRes] = await Promise.all([
               this.supabase.from('books').select('*').order('title'),
               this.supabase.from('book_copies').select('*'),
               this.supabase.from('checkouts').select('*').is('returned_at', null),
               this.supabase.from('reviews').select('title_key, rating'),
+              this.supabase.from('categories').select('*').order('name'),
             ]);
             if (booksRes.error) throw booksRes.error;
             if (copiesRes.error) throw copiesRes.error;
             if (checkoutsRes.error) throw checkoutsRes.error;
             if (reviewsRes.error) throw reviewsRes.error;
+            if (categoriesRes.error) throw categoriesRes.error;
 
             const allReviews = reviewsRes.data || [];
+            this.dbCategories = categoriesRes.data || [];
             this.books = booksRes.data.map(book => {
               const bookCopies = copiesRes.data.filter(c => c.book_id === book.id).map(copy => {
                 const checkout = checkoutsRes.data.find(ch => ch.copy_id === copy.id) || null;
@@ -402,7 +410,8 @@
             const q = this.search.toLowerCase();
             const copyCodeMatch = book.copies.some(c => (c.copy_code || '').toLowerCase().includes(q));
             const matchSearch = !q || book.title.toLowerCase().includes(q) || book.author.toLowerCase().includes(q) || copyCodeMatch;
-            const matchCategory = !this.filterCategory || book.category === this.filterCategory;
+            const bookCats = book.categories?.length ? book.categories : (book.category ? [book.category] : []);
+            const matchCategory = !this.filterCategory || bookCats.includes(this.filterCategory);
             const matchLocation = !this.filterLocation || book.location === this.filterLocation;
             const hasAvailable = book.copies.some(c => c.available);
             const hasCheckedOut = book.copies.some(c => !c.available);
@@ -414,7 +423,15 @@
         },
 
         get categories() {
-          return [...new Set(this.books.map(b => b.category).filter(Boolean))].sort();
+          if (this.dbCategories.length) {
+            return this.dbCategories.map(c => c.name).sort();
+          }
+          const names = new Set();
+          this.books.forEach(b => {
+            if (b.categories?.length) b.categories.forEach(c => names.add(c));
+            else if (b.category) names.add(b.category);
+          });
+          return [...names].sort();
         },
 
         dueDate() {

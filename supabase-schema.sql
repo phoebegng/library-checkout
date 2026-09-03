@@ -12,11 +12,25 @@ CREATE TABLE IF NOT EXISTS books (
   author      TEXT NOT NULL,
   isbn        TEXT,
   category    TEXT,
+  categories  TEXT[],
   location    TEXT CHECK (location IN ('ACT', 'ACTS')),
   total_copies INTEGER NOT NULL DEFAULT 1,
   cover_url   TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Categories reference table
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'categories' AND policyname = 'Allow all on categories') THEN
+    CREATE POLICY "Allow all on categories" ON categories FOR ALL USING (true) WITH CHECK (true);
+  END IF;
+END $$;
 
 -- Individual physical copies of each book
 CREATE TABLE IF NOT EXISTS book_copies (
@@ -43,6 +57,12 @@ CREATE TABLE IF NOT EXISTS checkouts (
 -- Add location column if upgrading an existing database
 -- (safe to run even if column already exists)
 ALTER TABLE books ADD COLUMN IF NOT EXISTS location TEXT CHECK (location IN ('ACT', 'ACTS'));
+
+-- Add categories array for multi-category support
+ALTER TABLE books ADD COLUMN IF NOT EXISTS categories TEXT[];
+
+-- Backfill categories from legacy single category column
+UPDATE books SET categories = ARRAY[category] WHERE categories IS NULL AND category IS NOT NULL;
 
 -- Add title_key column (normalized lowercase title for grouping reviews)
 ALTER TABLE books ADD COLUMN IF NOT EXISTS title_key TEXT;
@@ -124,12 +144,20 @@ END $$;
 -- Sample data (optional — delete if not needed)
 -- ============================================================
 
-INSERT INTO books (title, author, isbn, category, location, total_copies) VALUES
-  ('Atomic Habits', 'James Clear', '9780735211292', 'Personal Development', 'ACT', 2),
-  ('The Lean Startup', 'Eric Ries', '9780307887894', 'Business', 'ACT', 1),
-  ('Deep Work', 'Cal Newport', '9781455586691', 'Productivity', 'ACTS', 2),
-  ('Designing Your Life', 'Bill Burnett & Dave Evans', '9781101875322', 'Career', 'ACTS', 1),
-  ('The Five Dysfunctions of a Team', 'Patrick Lencioni', '9780787960759', 'Leadership', 'ACT', 2)
+INSERT INTO categories (name) VALUES
+  ('Personal Development'),
+  ('Business'),
+  ('Productivity'),
+  ('Career'),
+  ('Leadership')
+ON CONFLICT (name) DO NOTHING;
+
+INSERT INTO books (title, author, isbn, category, categories, location, total_copies) VALUES
+  ('Atomic Habits', 'James Clear', '9780735211292', 'Personal Development', ARRAY['Personal Development'], 'ACT', 2),
+  ('The Lean Startup', 'Eric Ries', '9780307887894', 'Business', ARRAY['Business'], 'ACT', 1),
+  ('Deep Work', 'Cal Newport', '9781455586691', 'Productivity', ARRAY['Productivity'], 'ACTS', 2),
+  ('Designing Your Life', 'Bill Burnett & Dave Evans', '9781101875322', 'Career', ARRAY['Career'], 'ACTS', 1),
+  ('The Five Dysfunctions of a Team', 'Patrick Lencioni', '9780787960759', 'Leadership', ARRAY['Leadership'], 'ACT', 2)
 ON CONFLICT DO NOTHING;
 
 -- Create copies for the sample books

@@ -79,6 +79,8 @@
         <span x-show="overdueCount > 0" x-text="overdueCount"
           class="ml-1 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5"></span>
       </button>
+      <button @click="activeTab = 'categories'" :class="activeTab === 'categories' ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'"
+        class="px-4 py-2 text-sm font-medium rounded-lg transition-all">Categories</button>
     </div>
 
     <!-- Error -->
@@ -106,7 +108,7 @@
               <th class="text-left px-4 py-3 font-medium text-gray-600">Copy Codes</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Title</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Author</th>
-              <th class="text-left px-4 py-3 font-medium text-gray-600">Category</th>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Categories</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Location</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Available</th>
               <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
@@ -130,8 +132,12 @@
                 <td class="px-4 py-3 font-medium text-gray-900" x-text="book.title"></td>
                 <td class="px-4 py-3 text-gray-600" x-text="book.author"></td>
                 <td class="px-4 py-3">
-                  <span x-show="book.category" x-text="book.category"
-                    class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100"></span>
+                  <div class="flex flex-wrap gap-1">
+                    <template x-for="cat in (book.categories?.length ? book.categories : (book.category ? [book.category] : []))" :key="cat">
+                      <span x-text="cat"
+                        class="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100"></span>
+                    </template>
+                  </div>
                 </td>
                 <td class="px-4 py-3">
                   <span x-show="book.location" x-text="book.location"
@@ -284,6 +290,57 @@
         </table>
       </div>
     </div>
+
+    <!-- CATEGORIES TAB -->
+    <div x-show="activeTab === 'categories'">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-semibold text-gray-900">Categories</h2>
+        <button @click="openAddCategory()"
+          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Add Category
+        </button>
+      </div>
+      <div x-show="loading" class="flex justify-center py-12">
+        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+      <div x-show="!loading" class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Name</th>
+              <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <template x-for="cat in categories" :key="cat.id">
+              <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3 text-gray-900" x-text="cat.name"></td>
+                <td class="px-4 py-3 text-right">
+                  <div class="flex gap-2 justify-end items-center">
+                    <button @click="openEditCategory(cat)" title="Edit"
+                      class="text-blue-600 hover:text-blue-800 p-1.5 rounded hover:bg-blue-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                      </svg>
+                    </button>
+                    <button @click="deleteCategory(cat)" title="Delete"
+                      class="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                      </svg>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+            <tr x-show="categories.length === 0">
+              <td colspan="2" class="px-4 py-8 text-center text-gray-400">No categories yet.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Add/Edit Book Modal -->
@@ -338,23 +395,33 @@
             <label class="block text-sm font-medium text-gray-700 mb-1">ISBN</label>
             <input type="text" x-model="bookModal.form.isbn" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select x-show="!bookModal.addingCategory" x-model="bookModal.form.category"
-              @change="if(bookModal.form.category === '__new__') { bookModal.addingCategory = true; bookModal.form.category = ''; }"
-              class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
-              <option value="">Select category...</option>
-              <template x-for="cat in categoryList" :key="cat">
-                <option :value="cat" x-text="cat"></option>
+          <div class="col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Categories</label>
+            <div class="flex flex-wrap gap-1 mb-2">
+              <template x-for="cat in bookModal.form.categories" :key="cat">
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100">
+                  <span x-text="cat"></span>
+                  <button type="button" @click="bookModal.form.categories = bookModal.form.categories.filter(c => c !== cat)" class="text-blue-400 hover:text-blue-600 leading-none">&times;</button>
+                </span>
               </template>
-              <option value="__new__">+ Add new category...</option>
-            </select>
-            <div x-show="bookModal.addingCategory" class="flex gap-2">
-              <input type="text" x-model="bookModal.form.category" placeholder="New category name"
-                x-ref="newCatInput"
-                class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-              <button type="button" @click="bookModal.addingCategory = false"
-                class="text-xs px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 text-gray-500">Cancel</button>
+              <span x-show="!bookModal.form.categories.length" class="text-xs text-gray-400 italic">No categories selected</span>
+            </div>
+            <div class="relative">
+              <button type="button" @click="bookModal.catOpen = !bookModal.catOpen"
+                class="w-full text-left border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <span x-text="bookModal.form.categories.length ? bookModal.form.categories.length + ' selected' : 'Select categories...'"></span>
+              </button>
+              <div x-show="bookModal.catOpen" @click.away="bookModal.catOpen = false"
+                class="absolute z-10 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-48 overflow-y-auto p-2">
+                <template x-for="cat in categoryList" :key="cat">
+                  <label class="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer">
+                    <input type="checkbox" :value="cat" x-model="bookModal.form.categories"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    <span class="text-sm text-gray-700" x-text="cat"></span>
+                  </label>
+                </template>
+                <p x-show="!categoryList.length" class="text-xs text-gray-400 px-2 py-1">No categories defined. Add them in the Categories tab.</p>
+              </div>
             </div>
           </div>
           <div>
@@ -393,6 +460,32 @@
           class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
           <span x-show="!bookModal.loading" x-text="bookModal.editId ? 'Save Changes' : 'Add Book'"></span>
           <span x-show="bookModal.loading">Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Modal -->
+  <div x-show="categoryModal.open" x-cloak
+    class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+    @click.self="categoryModal.open = false">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+      <h2 class="text-lg font-bold text-gray-900 mb-4" x-text="categoryModal.editId ? 'Edit Category' : 'Add Category'"></h2>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Name <span class="text-red-500">*</span></label>
+          <input type="text" x-model="categoryModal.name"
+            class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        </div>
+      </div>
+      <p x-show="categoryModal.error" class="text-red-500 text-xs mt-3" x-text="categoryModal.error"></p>
+      <div class="mt-5 flex gap-3">
+        <button @click="categoryModal.open = false"
+          class="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm hover:bg-gray-50">Cancel</button>
+        <button @click="saveCategory()" :disabled="categoryModal.loading"
+          class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50">
+          <span x-show="!categoryModal.loading" x-text="categoryModal.editId ? 'Save Changes' : 'Add Category'"></span>
+          <span x-show="categoryModal.loading">Saving...</span>
         </button>
       </div>
     </div>
@@ -447,19 +540,20 @@
         activeCheckouts: [],
         allCheckouts: [],
         overdueCheckouts: [],
+        categories: [],
         loading: true,
         error: '',
         sendingEmails: false,
         emailResult: null,
         toast: { show: false, message: '', type: 'success' },
         supabase: null,
-        bookModal: { open: false, editId: null, form: {}, error: '', loading: false, addingCategory: false, isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: '' },
+        bookModal: { open: false, editId: null, form: { title: '', author: '', isbn: '', categories: [], location: '', total_copies: 1, cover_url: '' }, error: '', loading: false, catOpen: false, isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: '' },
+        categoryModal: { open: false, editId: null, name: '', error: '', loading: false },
         _scanner: null,
         _lastLookupId: 0,
 
         get categoryList() {
-          const cats = this.books.map(b => b.category).filter(Boolean);
-          return [...new Set(cats)].sort();
+          return this.categories.map(c => c.name).sort();
         },
         deleteModal: { open: false, book: null, loading: false },
 
@@ -479,17 +573,20 @@
         async loadAll() {
           this.loading = true;
           try {
-            const [booksRes, copiesRes, checkoutsRes] = await Promise.all([
+            const [booksRes, copiesRes, checkoutsRes, categoriesRes] = await Promise.all([
               this.supabase.from('books').select('*').order('title'),
               this.supabase.from('book_copies').select('*'),
               this.supabase.from('checkouts').select('*, books(title)').order('checkout_date', { ascending: false }),
+              this.supabase.from('categories').select('*').order('name'),
             ]);
             if (booksRes.error) throw booksRes.error;
             if (copiesRes.error) throw copiesRes.error;
             if (checkoutsRes.error) throw checkoutsRes.error;
+            if (categoriesRes.error) throw categoriesRes.error;
 
             const copies = copiesRes.data;
             const checkouts = checkoutsRes.data;
+            this.categories = categoriesRes.data || [];
 
             const activeCopyIds = new Set(checkouts.filter(ch => !ch.returned_at).map(ch => ch.copy_id));
             this.books = booksRes.data.map(book => {
@@ -599,7 +696,7 @@
               m.form.author = book.author || m.form.author;
               m.form.isbn = book.isbn || isbn;
               m.form.cover_url = book.cover_url || m.form.cover_url || '';
-              if (book.category && !m.form.category) m.form.category = book.category;
+              if (book.category && !m.form.categories.includes(book.category)) m.form.categories.push(book.category);
               m.isbnSuccess = true;
               if (m.scannerOpen) this.toggleScanner();
             }
@@ -689,17 +786,18 @@
           if (this._scanner) { this._scanner.stop().catch(() => {}); this._scanner = null; }
           this.bookModal = {
             open: true, editId: null,
-            form: { title: '', author: '', isbn: '', category: '', location: '', total_copies: 1, cover_url: '' },
-            error: '', loading: false, addingCategory: false,
+            form: { title: '', author: '', isbn: '', categories: [], location: '', total_copies: 1, cover_url: '' },
+            error: '', loading: false, catOpen: false,
             isbnScan: '', isbnLoading: false, isbnError: '', isbnSuccess: false, scannerOpen: false, cameras: [], selectedCamera: ''
           };
         },
 
         openEditBook(book) {
+          const cats = book.categories?.length ? [...book.categories] : (book.category ? [book.category] : []);
           this.bookModal = {
             open: true, editId: book.id,
-            form: { title: book.title, author: book.author, isbn: book.isbn || '', category: book.category || '', location: book.location || '', total_copies: book.total_copies, cover_url: book.cover_url || '' },
-            error: '', loading: false, addingCategory: false
+            form: { title: book.title, author: book.author, isbn: book.isbn || '', categories: cats, location: book.location || '', total_copies: book.total_copies, cover_url: book.cover_url || '' },
+            error: '', loading: false, catOpen: false
           };
         },
 
@@ -717,7 +815,8 @@
               title: f.title.trim(),
               author: f.author.trim(),
               isbn: f.isbn?.trim() || null,
-              category: f.category?.trim() || null,
+              categories: f.categories?.length ? f.categories : null,
+              category: f.categories?.[0] || null,
               location: f.location || null,
               total_copies: parseInt(f.total_copies),
               cover_url: f.cover_url?.trim() || null,
@@ -808,7 +907,8 @@
               title: book.title + ' (Copy)',
               author: book.author,
               isbn: book.isbn || null,
-              category: book.category || null,
+              categories: book.categories?.length ? book.categories : (book.category ? [book.category] : null),
+              category: book.category || (book.categories?.[0] || null),
               location: book.location || null,
               total_copies: book.total_copies,
               cover_url: book.cover_url || null,
@@ -881,6 +981,56 @@
             this.emailResult = { success: false, message: 'Failed to send emails: ' + e.message };
           } finally {
             this.sendingEmails = false;
+          }
+        },
+
+        async loadCategories() {
+          const { data, error } = await this.supabase.from('categories').select('*').order('name');
+          if (error) throw error;
+          this.categories = data || [];
+        },
+
+        openAddCategory() {
+          this.categoryModal = { open: true, editId: null, name: '', error: '', loading: false };
+        },
+
+        openEditCategory(cat) {
+          this.categoryModal = { open: true, editId: cat.id, name: cat.name, error: '', loading: false };
+        },
+
+        async saveCategory() {
+          const m = this.categoryModal;
+          const name = m.name.trim();
+          if (!name) { m.error = 'Category name is required.'; return; }
+          m.error = '';
+          m.loading = true;
+          try {
+            if (m.editId) {
+              const { error } = await this.supabase.from('categories').update({ name }).eq('id', m.editId);
+              if (error) throw error;
+            } else {
+              const { error } = await this.supabase.from('categories').insert({ name });
+              if (error) throw error;
+            }
+            m.open = false;
+            this.showToast(m.editId ? 'Category updated.' : 'Category added.', 'success');
+            await this.loadCategories();
+          } catch (e) {
+            m.error = 'Failed to save category: ' + e.message;
+          } finally {
+            m.loading = false;
+          }
+        },
+
+        async deleteCategory(cat) {
+          if (!confirm('Delete category "' + cat.name + '"? This will not remove it from existing books.')) return;
+          try {
+            const { error } = await this.supabase.from('categories').delete().eq('id', cat.id);
+            if (error) throw error;
+            this.showToast('Category deleted.', 'success');
+            await this.loadCategories();
+          } catch (e) {
+            this.error = 'Failed to delete category: ' + e.message;
           }
         },
 
