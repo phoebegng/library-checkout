@@ -35,8 +35,10 @@
           autocomplete="off"
         />
         <p x-show="pinError" class="text-red-500 text-sm text-center mb-3" x-text="pinError"></p>
-        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors">
-          Unlock
+        <button type="submit" :disabled="pinLoading"
+          class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50">
+          <span x-show="!pinLoading">Unlock</span>
+          <span x-show="pinLoading">Verifying...</span>
         </button>
       </form>
       <div class="mt-4 text-center">
@@ -552,16 +554,27 @@
         unlocked: false,
         pinInput: '',
         pinError: '',
+        pinLoading: false,
 
-        checkPin() {
-          const correct = window.ADMIN_PIN || '1234';
-          if (this.pinInput === correct) {
+        async checkPin() {
+          this.pinError = '';
+          if (!this.pinInput) { this.pinError = 'Please enter a PIN.'; return; }
+          if (!window.SUPABASE_URL || window.SUPABASE_URL === 'YOUR_SUPABASE_URL') {
+            this.pinError = 'Supabase is not configured.'; return;
+          }
+          this.pinLoading = true;
+          try {
+            const client = this.supabase || supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+            const { data, error } = await client.functions.invoke('verify-pin', { body: { pin: this.pinInput } });
+            if (error || !data?.success) throw error || new Error('Invalid PIN');
             this.unlocked = true;
             sessionStorage.setItem('admin_unlocked', '1');
-          } else {
+          } catch (e) {
             this.pinError = 'Incorrect PIN. Please try again.';
             this.pinInput = '';
-            this.$nextTick(() => this.$refs.pinField.focus());
+            this.$nextTick(() => this.$refs.pinField?.focus());
+          } finally {
+            this.pinLoading = false;
           }
         },
 

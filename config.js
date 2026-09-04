@@ -14,5 +14,6 @@ window.SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXB
 // Example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'
 
 // Admin PIN — protects the Admin and Settings pages.
-// Change this to any PIN or password you want.
-window.ADMIN_PIN = '26288';
+// The PIN is stored as a Supabase Edge Function secret (ADMIN_PIN)
+// instead of here, so it is not published to GitHub.
+// Set it with: npx supabase secrets set ADMIN_PIN "your-pin"
