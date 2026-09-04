@@ -90,13 +90,17 @@
 
     <!-- BOOKS TAB -->
     <div x-show="activeTab === 'books'">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <h2 class="text-lg font-semibold text-gray-900">Book Catalog</h2>
-        <button @click="openAddBook()"
-          class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-          Add Book
-        </button>
+        <div class="flex items-center gap-3">
+          <input type="search" x-model="search" placeholder="Search title, author, ISBN, copy code, category..."
+            class="w-full sm:w-72 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          <button @click="openAddBook()"
+            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium shrink-0">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Book
+          </button>
+        </div>
       </div>
 
       <div x-show="loading" class="flex justify-center py-12">
@@ -107,6 +111,7 @@
         <table class="w-full text-sm">
           <thead class="bg-gray-50 border-b border-gray-200">
             <tr>
+              <th class="text-left px-4 py-3 font-medium text-gray-600">Cover</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Copy Codes</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Title</th>
               <th class="text-left px-4 py-3 font-medium text-gray-600">Author</th>
@@ -115,10 +120,63 @@
               <th class="text-left px-4 py-3 font-medium text-gray-600">Available</th>
               <th class="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
             </tr>
+            <tr class="bg-gray-50 border-b border-gray-200">
+              <th class="px-2 py-2 align-top"></th>
+              <th class="px-2 py-2 align-top">
+                <input type="text" x-model="filterCopyCode" placeholder="Code"
+                  class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </th>
+              <th class="px-2 py-2 align-top">
+                <input type="text" x-model="filterTitle" placeholder="Title"
+                  class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </th>
+              <th class="px-2 py-2 align-top">
+                <input type="text" x-model="filterAuthor" placeholder="Author"
+                  class="w-full border border-gray-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500" />
+              </th>
+              <th class="px-2 py-2 align-top">
+                <select x-model="filterCategory"
+                  class="w-full border border-gray-300 rounded-md px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="">All</option>
+                  <template x-for="cat in categoryList" :key="cat">
+                    <option :value="cat" x-text="cat"></option>
+                  </template>
+                </select>
+              </th>
+              <th class="px-2 py-2 align-top">
+                <select x-model="filterLocation"
+                  class="w-full border border-gray-300 rounded-md px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="">All</option>
+                  <option value="ACT">ACT</option>
+                  <option value="ACTS">ACTS</option>
+                </select>
+              </th>
+              <th class="px-2 py-2 align-top">
+                <select x-model="filterStatus"
+                  class="w-full border border-gray-300 rounded-md px-1 py-1 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                  <option value="">All</option>
+                  <option value="available">Available</option>
+                  <option value="checked_out">Checked Out</option>
+                </select>
+              </th>
+              <th class="px-2 py-2 align-top text-right">
+                <button type="button" @click="clearFilters()" class="text-xs text-blue-600 hover:text-blue-800">Clear</button>
+              </th>
+            </tr>
           </thead>
           <tbody class="divide-y divide-gray-100">
-            <template x-for="book in books" :key="book.id">
+            <template x-for="book in filteredBooks" :key="book.id">
               <tr class="hover:bg-gray-50">
+                <td class="px-4 py-3" x-data="{ coverError: false }">
+                  <template x-if="book.cover_url && !coverError">
+                    <img :src="book.cover_url" :alt="book.title"
+                      class="h-14 w-auto max-w-[3.5rem] object-cover rounded border border-gray-200"
+                      @error="coverError = true">
+                  </template>
+                  <template x-if="!book.cover_url || coverError">
+                    <div class="h-14 w-10 rounded border border-gray-200 bg-gray-100 flex items-center justify-center text-xs text-gray-400">—</div>
+                  </template>
+                </td>
                 <td class="px-4 py-3">
                   <div class="flex flex-wrap gap-1">
                     <template x-for="copy in book.copies" :key="copy.id">
@@ -176,8 +234,10 @@
                 </td>
               </tr>
             </template>
-            <tr x-show="books.length === 0">
-              <td colspan="6" class="px-4 py-8 text-center text-gray-400">No books yet. Add your first book!</td>
+            <tr x-show="filteredBooks.length === 0">
+              <td colspan="8" class="px-4 py-8 text-center text-gray-400">
+                <span x-text="search ? 'No books match your search.' : 'No books yet. Add your first book!'"></span>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -584,6 +644,13 @@
         allCheckouts: [],
         overdueCheckouts: [],
         categories: [],
+        search: '',
+        filterTitle: '',
+        filterAuthor: '',
+        filterCopyCode: '',
+        filterCategory: '',
+        filterLocation: '',
+        filterStatus: '',
         loading: true,
         error: '',
         sendingEmails: false,
@@ -603,6 +670,51 @@
           const cat = this.categories.find(c => c.name === name);
           const color = cat?.color || '#3b82f6';
           return { backgroundColor: color + '20', color: color, borderColor: color + '40' };
+        },
+
+        get filteredBooks() {
+          const q = this.search.toLowerCase().trim();
+          const title = this.filterTitle.toLowerCase().trim();
+          const author = this.filterAuthor.toLowerCase().trim();
+          const copyCode = this.filterCopyCode.toLowerCase().trim();
+          const category = this.filterCategory;
+          const location = this.filterLocation;
+          const status = this.filterStatus;
+          return this.books.filter(book => {
+            if (q && !(
+              book.title.toLowerCase().includes(q) ||
+              book.author.toLowerCase().includes(q) ||
+              (book.isbn || '').toLowerCase().includes(q) ||
+              (book.location || '').toLowerCase().includes(q) ||
+              book.copies.some(c => (c.copy_code || '').toLowerCase().includes(q)) ||
+              (book.categories?.length ? book.categories : (book.category ? [book.category] : [])).some(c => c.toLowerCase().includes(q))
+            )) return false;
+            if (title && !book.title.toLowerCase().includes(title)) return false;
+            if (author && !book.author.toLowerCase().includes(author)) return false;
+            if (copyCode && !book.copies.some(c => (c.copy_code || '').toLowerCase().includes(copyCode))) return false;
+            if (category) {
+              const cats = book.categories?.length ? book.categories : (book.category ? [book.category] : []);
+              if (!cats.includes(category)) return false;
+            }
+            if (location && book.location !== location) return false;
+            if (status) {
+              const hasAvailable = book.available_count > 0;
+              const hasCheckedOut = book.copies.some(c => c.checked_out);
+              if (status === 'available' && !hasAvailable) return false;
+              if (status === 'checked_out' && !hasCheckedOut) return false;
+            }
+            return true;
+          });
+        },
+
+        clearFilters() {
+          this.search = '';
+          this.filterTitle = '';
+          this.filterAuthor = '';
+          this.filterCopyCode = '';
+          this.filterCategory = '';
+          this.filterLocation = '';
+          this.filterStatus = '';
         },
 
         deleteModal: { open: false, book: null, loading: false },
